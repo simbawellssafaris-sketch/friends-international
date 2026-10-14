@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { CONFIG } from "@/data/config";
 import Icon from "./Icon";
+import { submitRequest } from "@/lib/requests";
 
 // Booking / customise form shared by every page. Any component can call useBooking().open({ mode, trip, tier, pax, camp, children }).
 const TIERS = { budget: "Budget", mid: "Mid-range", luxury: "Luxury" };
@@ -70,6 +71,17 @@ function BookingModal({ o, close }) {
     setErr("");
     const text = message();
     const subject = (mode === "book" ? "Booking request: " : "Customise trip: ") + (f.trip.value.trim() || "New trip");
+    // Save the request to Supabase while the WhatsApp / email flow starts (opened first so browsers allow the pop-up).
+    const saving = f.website && f.website.value
+      ? Promise.resolve({ ok: false }) // hidden spam-trap field was filled in: a bot
+      : submitRequest({
+          kind: mode, channel: how === "wa" ? "whatsapp" : "email",
+          trip: f.trip.value, name: f.name.value, phone: f.phone.value, email: f.email.value,
+          date: f.date.value, adults: f.adults.value, children: f.children.value,
+          level: camp ? "" : f.tier?.value, childAges: camp ? f.childage?.value : "",
+          changes: [...formRef.current.querySelectorAll("input[name=opt]:checked")].map((x) => x.value),
+          details: f.custom?.value, notes: f.notes.value,
+        });
     let msg;
     if (how === "wa") {
       window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text)}`, "_blank");
@@ -84,7 +96,8 @@ function BookingModal({ o, close }) {
       window.location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
       msg = "Your email app has opened with your request filled in. Just press send and we will reply with your quote.";
     }
-    setDone(msg);
+    const saved = await saving;
+    setDone(msg + (saved.ok ? " Your request has also been saved with us." : ""));
   };
 
   return (
@@ -137,6 +150,8 @@ function BookingModal({ o, close }) {
               </div>
             )}
             <label>Anything else we should know?<textarea name="notes" rows="2" /></label>
+            {/* spam trap: hidden from people, bots fill it in */}
+            <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
             {err && <p className="bk-err">{err}</p>}
             <div className="bk-actions">
               <button type="button" className="btn wa" onClick={() => send("wa")}><Icon name="message-circle" size={18} /> Send via WhatsApp</button>

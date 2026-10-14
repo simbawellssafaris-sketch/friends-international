@@ -2,3 +2,11 @@ node_modules
 .next
 out
 .env*.local
+
+# local environment files
+.env
+
+# local tooling
+.agents/
+.claude/
+skills-lock.json

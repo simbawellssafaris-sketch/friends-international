@@ -9,6 +9,7 @@ import { PackageCard, tierName } from "./Cards";
 import Footer from "./Footer";
 import HeroCarousel from "./HeroCarousel";
 import WaFloat from "./WaFloat";
+import { submitRequest } from "@/lib/requests";
 
 const FEATURED = ["mara-amboseli-mid", "northern-circuit-lodge", "kenya-luxury-samburu-mara", "mara-3day-mid", "dubai-city-break", "bali-mid"];
 const stayKeys = Object.keys(STAYS);
@@ -106,19 +107,32 @@ export default function HomeClient({ initial = {} }) {
   // ---- contact form ----
   const enqText = (d) => `Name: ${d.name}\nEmail: ${d.email}\nPhone: ${d.phone}\nDestination: ${d.dest}\nStyle: ${d.tier}\nDate: ${d.date}\nTravellers: ${d.pax}\n\n${d.msg}`;
   const enqData = () => Object.fromEntries(new FormData(enqRef.current));
-  const enqWa = () => window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent("Trip enquiry\n" + enqText(enqData()))}`, "_blank");
+  // Save the enquiry to Supabase (anyone can submit; the hidden "website" field is a spam trap for bots).
+  const enqSave = (d, channel) => d.website ? Promise.resolve({ ok: false }) : submitRequest({
+    kind: "enquiry", channel, trip: d.dest, name: d.name, phone: d.phone, email: d.email,
+    date: d.date, adults: d.pax, level: d.tier, notes: d.msg,
+  });
+  const enqWa = () => {
+    const d = enqData();
+    if (!d.name?.trim() || (!d.phone?.trim() && !d.email?.trim())) { setFormMsg("Please add your name and a phone number or email first."); return; }
+    enqSave(d, "whatsapp");
+    window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent("Trip enquiry\n" + enqText(d))}`, "_blank");
+  };
   const enqSubmit = async (e) => {
     e.preventDefault();
     const d = enqData();
+    const saving = enqSave(d, CONFIG.formEndpoint ? "form" : "email");
     if (CONFIG.formEndpoint) {
       try {
         const r = await fetch(CONFIG.formEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(d) });
-        if (r.ok) { setFormMsg("Thank you! We will contact you shortly."); e.target.reset(); return; }
+        if (r.ok) { setFormMsg("Thank you! We will contact you shortly."); e.target.reset(); await saving; return; }
       } catch (_) { /* fall through */ }
       setFormMsg("Could not send. Please use WhatsApp or email us.");
       return;
     }
     window.location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent("Trip enquiry: " + d.dest)}&body=${encodeURIComponent(enqText(d))}`;
+    const saved = await saving;
+    setFormMsg(saved.ok ? "Thank you! Your enquiry has been saved and your email app has opened. Press send to finish." : "Your email app has opened. Press send to finish.");
   };
 
   const ke = COUNTRIES.find((c) => c.slug === "kenya"), tz = COUNTRIES.find((c) => c.slug === "tanzania");
@@ -383,6 +397,7 @@ export default function HomeClient({ initial = {} }) {
             <select name="tier"><option>Budget</option><option>Mid-range</option><option>Luxury</option></select>
             <div className="row2"><input name="date" type="date" /><input name="pax" type="number" min="1" placeholder="Travellers" /></div>
             <textarea name="msg" rows="3" placeholder="Anything else?" />
+            <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
             <button className="btn" type="submit">Send enquiry</button>
             <button className="btn wa" type="button" onClick={enqWa}>Send on WhatsApp</button>
             <small>{formMsg}</small>

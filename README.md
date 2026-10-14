@@ -33,3 +33,18 @@ npm start        # run the production build, http://localhost:3000
 
 Edit `src/data/config.js`: phone number, WhatsApp number (digits only, with country code), email and head office.
 Paste a Formspree URL into `formEndpoint` to receive booking requests by email without opening the visitor's mail app.
+
+## Supabase (form submissions)
+
+Every booking, customise and enquiry form saves its details to a Supabase table called `booking_requests`,
+in addition to opening WhatsApp or email as before. There is no sign-in: any visitor can submit.
+
+1. Copy `.env.example` to `.env` and fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   (Supabase dashboard > Project Settings > API). When you deploy, add the same two variables in your host's settings.
+2. The table is created by `supabase/migrations/20261014120000_create_booking_requests.sql`
+   (already applied to the project; run it in the SQL editor on a new project).
+3. Visitors can only **insert** rows (Row Level Security). Nobody can read, change or delete them through the public key.
+   Read the requests in the Supabase dashboard > Table Editor > `booking_requests`.
+
+Code: `src/lib/supabase/client.js` (browser), `src/lib/supabase/server.js` (server, for later),
+`src/lib/requests.js` (saves a request).
