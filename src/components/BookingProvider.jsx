@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { CONFIG } from "@/data/config";
 import Icon from "./Icon";
-import { submitRequest } from "@/lib/requests";
+import { submitRequest, emailRequest } from "@/lib/requests";
 
 // Booking / customise form shared by every page. Any component can call useBooking().open({ mode, trip, tier, pax, camp, children }).
 const TIERS = { budget: "Budget", mid: "Mid-range", luxury: "Luxury" };
@@ -36,6 +36,7 @@ function BookingModal({ o, close }) {
   const nameRef = useRef(null);
   const [err, setErr] = useState("");
   const [done, setDone] = useState("");
+  const [busy, setBusy] = useState(false);
   const mode = o.mode;
   const camp = !!o.camp;
 
@@ -71,33 +72,41 @@ function BookingModal({ o, close }) {
     setErr("");
     const text = message();
     const subject = (mode === "book" ? "Booking request: " : "Customise trip: ") + (f.trip.value.trim() || "New trip");
-    // Save the request to Supabase while the WhatsApp / email flow starts (opened first so browsers allow the pop-up).
-    const saving = f.website && f.website.value
-      ? Promise.resolve({ ok: false }) // hidden spam-trap field was filled in: a bot
-      : submitRequest({
-          kind: mode, channel: how === "wa" ? "whatsapp" : "email",
-          trip: f.trip.value, name: f.name.value, phone: f.phone.value, email: f.email.value,
-          date: f.date.value, adults: f.adults.value, children: f.children.value,
-          level: camp ? "" : f.tier?.value, childAges: camp ? f.childage?.value : "",
-          changes: [...formRef.current.querySelectorAll("input[name=opt]:checked")].map((x) => x.value),
-          details: f.custom?.value, notes: f.notes.value,
-        });
+    const payload = {
+      kind: mode, channel: how === "wa" ? "whatsapp" : "email",
+      trip: f.trip.value, name: f.name.value, phone: f.phone.value, email: f.email.value,
+      date: f.date.value, adults: f.adults.value, children: f.children.value,
+      level: camp ? "" : f.tier?.value, childAges: camp ? f.childage?.value : "",
+      changes: [...formRef.current.querySelectorAll("input[name=opt]:checked")].map((x) => x.value),
+      details: f.custom?.value, notes: f.notes.value,
+    };
+    const bot = !!(f.website && f.website.value); // hidden spam-trap field was filled in
+    // Save a copy to Supabase and email the request to the business (server-side) alongside the visitor's own flow.
+    const saving = bot ? Promise.resolve({ ok: false }) : submitRequest(payload);
+    const mailing = bot ? Promise.resolve({ ok: true }) : emailRequest({ ...payload, website: f.website?.value });
     let msg;
     if (how === "wa") {
       window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(text)}`, "_blank");
       msg = "WhatsApp has opened with your request filled in. Just press send and we will reply with your quote.";
-    } else if (CONFIG.formEndpoint) {
-      try {
-        const r = await fetch(CONFIG.formEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ subject, message: text, name: f.name.value, email: f.email.value, phone: f.phone.value }) });
-        if (!r.ok) throw new Error("bad response");
-        msg = "Thank you! We have received your request and will reply with your quote shortly.";
-      } catch (_) { return fail("Could not send. Please use WhatsApp or try again."); }
     } else {
-      window.location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
-      msg = "Your email app has opened with your request filled in. Just press send and we will reply with your quote.";
+      setBusy(true);
+      const sent = await mailing;
+      setBusy(false);
+      if (sent.ok) {
+        msg = "Thank you! We have received your request and will reply with your quote shortly.";
+      } else if (CONFIG.formEndpoint) {
+        try {
+          const r = await fetch(CONFIG.formEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ subject, message: text, name: f.name.value, email: f.email.value, phone: f.phone.value }) });
+          if (!r.ok) throw new Error("bad response");
+          msg = "Thank you! We have received your request and will reply with your quote shortly.";
+        } catch (_) { return fail("Could not send. Please use WhatsApp or try again."); }
+      } else {
+        window.location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+        msg = "We could not send it automatically, so your email app has opened with your request filled in. Just press send.";
+      }
     }
-    const saved = await saving;
-    setDone(msg + (saved.ok ? " Your request has also been saved with us." : ""));
+    await saving;
+    setDone(msg);
   };
 
   return (
@@ -155,7 +164,7 @@ function BookingModal({ o, close }) {
             {err && <p className="bk-err">{err}</p>}
             <div className="bk-actions">
               <button type="button" className="btn wa" onClick={() => send("wa")}><Icon name="message-circle" size={18} /> Send via WhatsApp</button>
-              <button type="button" className="btn" onClick={() => send("mail")}><Icon name="mail" size={18} /> Send via email</button>
+              <button type="button" className="btn" disabled={busy} onClick={() => send("mail")}><Icon name="mail" size={18} /> {busy ? "Sending..." : "Send via email"}</button>
             </div>
             <small className="bk-note">Choose how you would like to send this request. Prices are on request and we reply with a quote.</small>
           </form>

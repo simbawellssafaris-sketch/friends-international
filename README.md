@@ -48,3 +48,19 @@ in addition to opening WhatsApp or email as before. There is no sign-in: any vis
 
 Code: `src/lib/supabase/client.js` (browser), `src/lib/supabase/server.js` (server, for later),
 `src/lib/requests.js` (saves a request).
+
+## Email (Hostinger SMTP)
+
+Enquiries and booking requests are emailed by the server route `src/app/api/enquiry/route.js` (nodemailer).
+The visitor's email is set as `Reply-To`. Credentials live only in server environment variables:
+
+| Variable | Example |
+|---|---|
+| `SMTP_HOST` | `smtp.hostinger.com` |
+| `SMTP_PORT` / `SMTP_SECURE` | `465` / `true` (or `587` / `false`) |
+| `SMTP_USER` / `SMTP_PASS` | the Hostinger mailbox address and its password |
+| `MAIL_FROM` | `"Friends International Website" <the mailbox address>` |
+| `MAIL_TO` | the address that receives enquiries (an alias is fine) |
+
+Set them in the Hostinger Node.js app settings (and in `.env.local` for local testing), then redeploy. If sending fails, the visitor
+is told and the form falls back to their email app / WhatsApp; a copy is still saved to Supabase.
