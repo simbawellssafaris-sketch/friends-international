@@ -500,3 +500,5 @@ aside{position:sticky;top:150px}
 .band{width:100%}
 .band.alt{background:var(--sand)}
 .band .cs{border-bottom:0}
+
+.form .consent-note{display:block;margin-top:8px;font-size:.78rem}

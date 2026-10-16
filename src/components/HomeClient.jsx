@@ -9,7 +9,7 @@ import { PackageCard, tierName } from "./Cards";
 import Footer from "./Footer";
 import HeroCarousel from "./HeroCarousel";
 import WaFloat from "./WaFloat";
-import { submitRequest, emailRequest } from "@/lib/requests";
+import { emailRequest } from "@/lib/requests";
 
 const FEATURED = ["mara-amboseli-mid", "northern-circuit-lodge", "kenya-luxury-samburu-mara", "mara-3day-mid", "dubai-city-break", "bali-mid"];
 const stayKeys = Object.keys(STAYS);
@@ -107,11 +107,6 @@ export default function HomeClient({ initial = {} }) {
   // ---- contact form ----
   const enqText = (d) => `Name: ${d.name}\nEmail: ${d.email}\nPhone: ${d.phone}\nDestination: ${d.dest}\nStyle: ${d.tier}\nDate: ${d.date}\nTravellers: ${d.pax}\n\n${d.msg}`;
   const enqData = () => Object.fromEntries(new FormData(enqRef.current));
-  // Save the enquiry to Supabase (anyone can submit; the hidden "website" field is a spam trap for bots).
-  const enqSave = (d, channel) => d.website ? Promise.resolve({ ok: false }) : submitRequest({
-    kind: "enquiry", channel, trip: d.dest, name: d.name, phone: d.phone, email: d.email,
-    date: d.date, adults: d.pax, level: d.tier, notes: d.msg,
-  });
   // Email the enquiry to the business through the server (Hostinger SMTP).
   const enqMail = (d, channel) => d.website ? Promise.resolve({ ok: true }) : emailRequest({
     kind: "enquiry", channel, trip: d.dest, name: d.name, phone: d.phone, email: d.email,
@@ -120,7 +115,6 @@ export default function HomeClient({ initial = {} }) {
   const enqWa = () => {
     const d = enqData();
     if (!d.name?.trim() || (!d.phone?.trim() && !d.email?.trim())) { setFormMsg("Please add your name and a phone number or email first."); return; }
-    enqSave(d, "whatsapp");
     enqMail(d, "whatsapp");
     window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent("Trip enquiry\n" + enqText(d))}`, "_blank");
   };
@@ -130,17 +124,15 @@ export default function HomeClient({ initial = {} }) {
     const d = enqData();
     if (!d.name?.trim() || (!d.phone?.trim() && !d.email?.trim())) { setFormMsg("Please add your name and a phone number or email first."); return; }
     setFormMsg("Sending...");
-    const saving = enqSave(d, "email");
     const sent = await enqMail(d, "email");
-    if (sent.ok) { await saving; setFormMsg("Thank you! We have received your enquiry and will contact you shortly."); form.reset(); return; }
+    if (sent.ok) { setFormMsg("Thank you! We have received your enquiry and will contact you shortly."); form.reset(); return; }
     if (CONFIG.formEndpoint) {
       try {
         const r = await fetch(CONFIG.formEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(d) });
-        if (r.ok) { setFormMsg("Thank you! We will contact you shortly."); form.reset(); await saving; return; }
+        if (r.ok) { setFormMsg("Thank you! We will contact you shortly."); form.reset(); return; }
       } catch (_) { /* fall through */ }
     }
     window.location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent("Trip enquiry: " + d.dest)}&body=${encodeURIComponent(enqText(d))}`;
-    await saving;
     setFormMsg((sent.error ? sent.error + " " : "") + "Your email app has opened with your enquiry filled in. Press send to finish.");
   };
 
@@ -410,6 +402,7 @@ export default function HomeClient({ initial = {} }) {
             <button className="btn" type="submit">Send enquiry</button>
             <button className="btn wa" type="button" onClick={enqWa}>Send on WhatsApp</button>
             <small>{formMsg}</small>
+            <small className="consent-note">By sending this form you agree that we may contact you about your trip. We use your details only for that.</small>
           </form>
         </div>
       </section>

@@ -1,11 +1,14 @@
 // Display helpers for the admin area. The business works in Nairobi time.
 const TZ = "Africa/Nairobi";
 
+// Whole amounts show without cents ($5,000); amounts with cents show two decimals ($5,000.50).
 export const money = (n, currency) => {
+  const v = Number(n) || 0;
+  const d = Math.abs(v - Math.round(v)) > 0.004 ? 2 : 0;
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(Number(n) || 0);
+    return new Intl.NumberFormat("en-US", { style: "currency", currency, minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
   } catch {
-    return `${currency} ${Math.round(Number(n) || 0).toLocaleString("en-US")}`;
+    return `${currency} ${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`;
   }
 };
 

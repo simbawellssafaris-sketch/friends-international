@@ -3,7 +3,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 // Only pages that exist are listed. New sections are added here as they are built.
-const ITEMS = [{ href: "/admin", label: "Dashboard" }];
+const ITEMS = [
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/enquiries", label: "Enquiries" },
+  { href: "/admin/clients", label: "Clients" },
+  { href: "/admin/bookings", label: "Bookings" },
+  { href: "/admin/quotations", label: "Quotations" },
+  { href: "/admin/invoices", label: "Invoices" },
+  { href: "/admin/payments", label: "Payments" },
+];
 
 export default function AdminNav() {
   const path = usePathname();

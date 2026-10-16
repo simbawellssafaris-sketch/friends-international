@@ -54,3 +54,41 @@ Migrations are in `supabase/migrations/` and are already applied to the project:
 - `..._business_tables.sql`: clients, enquiries, bookings, quotations, invoices, payments, receipts, activities, follow-ups, documents
 
 Backups: Supabase takes daily backups on paid plans. On the free plan, export your data regularly (Database -> Backups, or run `pg_dump`). Consider upgrading before you hold real client data.
+
+---
+
+## Stage 4: the business workflow
+
+### Public forms -> database
+Every public form (booking pop-up, customise, homepage enquiry, WhatsApp button) posts to `/api/enquiry`. The server validates it,
+checks the spam traps and rate limit, **saves it to `public.enquiries`**, then emails the business. If the email fails, the enquiry is
+kept and shows "Email not sent" in the admin area with a **Retry email** button. The same person sending the same request twice in a day
+is saved once.
+
+This needs one extra server-only variable in Hostinger -> Environment variables:
+
+| Name | Where to get it |
+|---|---|
+| `SUPABASE_SECRET_KEY` | Supabase -> Project Settings -> API Keys -> **Secret keys** -> copy the key that starts `sb_secret_` |
+
+Never paste it into chat, into the code, or into any variable that starts with `NEXT_PUBLIC_`. Redeploy after adding it.
+Until it is set, enquiries still reach your inbox by email but are **not** saved in the admin area.
+
+### Admin sections
+- **Enquiries**: search, filter, sort, status, notes, follow-up dates, communication history, assign, archive, CSV export, convert to booking.
+- **Clients**: contact details, history, totals per currency, documents, CSV export. Converting an enquiry reuses an existing client with the same email or phone.
+- **Bookings**: list, departure calendar, status (configurable in `booking_statuses`), prices, deposit, payments, printable summary, CSV export.
+- **Quotations**: line items with live totals (the database recalculates them), PDF, email to the client, revisions, accept, convert to booking.
+- **Invoices / Receipts / Payments**: invoices request money; receipts confirm money actually received. Only *confirmed* payments count as paid, and nothing is confirmed automatically.
+- **Documents**: private storage (`client-documents` bucket), opened through links that expire after 1 minute, every open is logged.
+
+### Money rules
+- Amounts are stored with two decimals and are never added across currencies (USD, EUR, GBP, KES supported; add more rows to `public.currencies`).
+- A payment must be in the same currency as its booking. A booking's balance = agreed (or quoted) price - confirmed payments.
+- Dashboard "booking value" and "payments received" are not profit. Profit is not calculated because no cost data is recorded.
+
+### Not included / for later
+- No online payment gateway is connected. Payments are recorded manually. When you choose a provider that supports Kenya, its webhook must be
+  verified server-side before a payment is marked confirmed (the `payments.provider` and `provider_txn_id` columns are ready for this).
+- Website content management (packages, destinations, FAQs, testimonials) is Stage 5.
+- Reports page with date-range CSV export is Stage 5/6.

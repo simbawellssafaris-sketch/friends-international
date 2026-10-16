@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { CONFIG } from "@/data/config";
 import Icon from "./Icon";
-import { submitRequest, emailRequest } from "@/lib/requests";
+import { emailRequest } from "@/lib/requests";
 
 // Booking / customise form shared by every page. Any component can call useBooking().open({ mode, trip, tier, pax, camp, children }).
 const TIERS = { budget: "Budget", mid: "Mid-range", luxury: "Luxury" };
@@ -81,8 +81,7 @@ function BookingModal({ o, close }) {
       details: f.custom?.value, notes: f.notes.value,
     };
     const bot = !!(f.website && f.website.value); // hidden spam-trap field was filled in
-    // Save a copy to Supabase and email the request to the business (server-side) alongside the visitor's own flow.
-    const saving = bot ? Promise.resolve({ ok: false }) : submitRequest(payload);
+    // The server saves the request to the database and emails the business, alongside the visitor's own flow.
     const mailing = bot ? Promise.resolve({ ok: true }) : emailRequest({ ...payload, website: f.website?.value });
     let msg;
     if (how === "wa") {
@@ -105,7 +104,6 @@ function BookingModal({ o, close }) {
         msg = "We could not send it automatically, so your email app has opened with your request filled in. Just press send.";
       }
     }
-    await saving;
     setDone(msg);
   };
 
@@ -166,7 +164,7 @@ function BookingModal({ o, close }) {
               <button type="button" className="btn wa" onClick={() => send("wa")}><Icon name="message-circle" size={18} /> Send via WhatsApp</button>
               <button type="button" className="btn" disabled={busy} onClick={() => send("mail")}><Icon name="mail" size={18} /> {busy ? "Sending..." : "Send via email"}</button>
             </div>
-            <small className="bk-note">Choose how you would like to send this request. Prices are on request and we reply with a quote.</small>
+            <small className="bk-note">Choose how you would like to send this request. Prices are on request and we reply with a quote. We use your details only to reply about your trip.</small>
           </form>
         )}
 

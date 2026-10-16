@@ -1,16 +1,19 @@
-import nodemailer from "nodemailer";
+import { createHash } from "node:crypto";
+import { createServiceClient } from "@/lib/supabase/service";
+import { sendEnquiryEmail, mailConfigured } from "@/lib/mail";
+import { dateStr } from "@/lib/admin/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Server-side email for contact forms and booking requests, sent over SMTP (Hostinger).
-// All credentials come from server environment variables and never reach the browser:
-//   SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, MAIL_FROM, MAIL_TO
+// Receives every public form (booking pop-up, customise, homepage enquiry, WhatsApp button).
+// 1) checks spam traps and limits, 2) validates, 3) saves to the database (server-side, secret key),
+// 4) emails the business and records whether that worked. A failed email never loses a saved enquiry.
 
-const KINDS = { book: "Booking request", customize: "Customise trip", enquiry: "Trip enquiry" };
-const MAX = { name: 120, phone: 40, email: 200, trip: 200, date: 10, level: 40, childAges: 100, details: 2000, notes: 2000 };
+const KINDS = ["book", "customize", "enquiry"];
+const CHANNELS = ["whatsapp", "email", "form"];
 
-// Simple per-visitor limit (resets when the server restarts): 5 emails per 10 minutes.
+// Per-visitor limit (resets when the server restarts): 5 submissions per 10 minutes.
 const hits = new Map();
 const WINDOW = 10 * 60 * 1000, LIMIT = 5;
 function limited(ip) {
@@ -25,8 +28,6 @@ function limited(ip) {
 
 const str = (v, max) => String(v ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").trim().slice(0, max);
 const oneLine = (v, max) => str(v, max).replace(/[\r\n]+/g, " ");
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
 export async function POST(req) {
@@ -35,62 +36,62 @@ export async function POST(req) {
   if (!b || typeof b !== "object") return json({ ok: false, error: "Invalid request." }, 400);
 
   // Spam protection: hidden field must be empty, and a human takes more than ~2 seconds to fill a form.
-  if (b.website) return json({ ok: true }); // pretend success so bots learn nothing
+  if (b.website) return json({ ok: true });
   const opened = Number(b.openedAt);
   if (Number.isFinite(opened) && Date.now() - opened < 2000) return json({ ok: true });
 
   const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
   if (limited(ip)) return json({ ok: false, error: "Too many requests. Please wait a few minutes or contact us on WhatsApp." }, 429);
 
-  const kind = KINDS[b.kind] ? b.kind : "enquiry";
+  const kind = KINDS.includes(b.kind) ? b.kind : "enquiry";
+  const channel = CHANNELS.includes(b.channel) ? b.channel : "form";
+  const adults = parseInt(b.adults, 10), children = parseInt(b.children, 10);
   const d = {
-    name: oneLine(b.name, MAX.name), phone: oneLine(b.phone, MAX.phone), email: oneLine(b.email, MAX.email),
-    trip: oneLine(b.trip, MAX.trip), date: oneLine(b.date, MAX.date), level: oneLine(b.level, MAX.level),
-    childAges: oneLine(b.childAges, MAX.childAges), details: str(b.details, MAX.details), notes: str(b.notes, MAX.notes),
-    adults: Number.isFinite(parseInt(b.adults, 10)) ? Math.min(50, Math.max(1, parseInt(b.adults, 10))) : "",
-    children: Number.isFinite(parseInt(b.children, 10)) ? Math.min(30, Math.max(0, parseInt(b.children, 10))) : "",
-    changes: Array.isArray(b.changes) ? b.changes.slice(0, 30).map((c) => oneLine(c, 100)).filter(Boolean) : [],
-    page: oneLine(b.page, 300),
+    full_name: oneLine(b.name, 120), phone: oneLine(b.phone, 40), email: oneLine(b.email, 200).toLowerCase(),
+    trip_title: oneLine(b.trip, 200), accommodation_pref: oneLine(b.level, 100), child_ages: oneLine(b.childAges, 100),
+    special_requests: [str(b.details, 2000), str(b.notes, 2000)].filter(Boolean).join("\n\n").slice(0, 4000),
+    source_page: oneLine(b.page, 500),
+    preferred_start: dateStr(oneLine(b.date, 10)),
+    adults: Number.isFinite(adults) ? Math.min(50, Math.max(1, adults)) : null,
+    children: Number.isFinite(children) ? Math.min(30, Math.max(0, children)) : null,
+    changes_wanted: Array.isArray(b.changes) ? b.changes.slice(0, 30).map((c) => oneLine(c, 100)).filter(Boolean) : [],
   };
 
-  if (!d.name) return json({ ok: false, error: "Please enter your name." }, 400);
+  if (!d.full_name) return json({ ok: false, error: "Please enter your name." }, 400);
   if (!d.phone && !d.email) return json({ ok: false, error: "Please add a phone number or an email so we can reply." }, 400);
   if (d.email && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(d.email)) return json({ ok: false, error: "That email address does not look right." }, 400);
 
-  const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, MAIL_FROM, MAIL_TO } = process.env;
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !MAIL_TO) {
-    console.error("[enquiry] SMTP is not configured (SMTP_HOST, SMTP_USER, SMTP_PASS, MAIL_TO).");
-    return json({ ok: false, error: "Email is not available right now. Please use WhatsApp." }, 503);
+  // The same person sending the same request twice on the same day is saved once.
+  const day = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+  // (a visitor who changes the message or dates and sends again creates a new record; an accidental double click does not)
+  const dedupe_key = createHash("sha256")
+    .update([(d.email || d.phone).toLowerCase(), d.trip_title.toLowerCase(), kind, day, d.preferred_start || "", d.adults || "", d.special_requests].join("|"))
+    .digest("hex");
+
+  const row = { ...d, kind, channel, dedupe_key, email: d.email || null, phone: d.phone || null, trip_title: d.trip_title || null,
+    accommodation_pref: d.accommodation_pref || null, child_ages: d.child_ages || null, special_requests: d.special_requests || null,
+    source_page: d.source_page || null, changes_wanted: d.changes_wanted.length ? d.changes_wanted : null };
+
+  let saved = null, duplicate = false;
+  const db = createServiceClient();
+  if (db) {
+    const { data, error } = await db.from("enquiries").insert(row).select("*").single();
+    if (error && error.code === "23505") duplicate = true;
+    else if (error) console.error("[enquiry] save failed:", error.code, error.message);
+    else saved = data;
+  } else {
+    console.error("[enquiry] SUPABASE_SECRET_KEY is not set: the enquiry cannot be saved to the database.");
   }
+  if (duplicate) return json({ ok: true, duplicate: true });
 
-  const rows = [
-    ["Type", KINDS[kind]], ["Trip", d.trip], ["Name", d.name], ["Phone", d.phone], ["Email", d.email],
-    ["Travel date", d.date], ["Adults", d.adults], ["Children", d.children], ["Travel style", d.level],
-    ["Children's ages", d.childAges], ["Changes wanted", d.changes.join(", ")], ["Details", d.details], ["Message", d.notes], ["Sent from", d.page],
-  ].filter(([, v]) => v !== "" && v != null);
+  let mailed = { ok: false, error: "Email is not configured" };
+  if (mailConfigured()) mailed = await sendEnquiryEmail(saved || { ...row, id: null, reference: null });
 
-  const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n");
-  const html = `<table cellpadding="6" style="font-family:Arial,sans-serif;font-size:14px;border-collapse:collapse">${rows
-    .map(([k, v]) => `<tr><td style="color:#666;vertical-align:top"><b>${esc(k)}</b></td><td style="white-space:pre-wrap">${esc(v)}</td></tr>`).join("")}</table>`;
-
-  try {
-    const port = Number(SMTP_PORT) || 465;
-    const transporter = nodemailer.createTransport({
-      host: SMTP_HOST, port,
-      secure: SMTP_SECURE ? SMTP_SECURE === "true" : port === 465,
-      auth: { user: SMTP_USER, pass: SMTP_PASS },
-      connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000,
-    });
-    await transporter.sendMail({
-      from: MAIL_FROM || SMTP_USER,
-      to: MAIL_TO,
-      ...(d.email ? { replyTo: { name: d.name, address: d.email } } : {}),
-      subject: `${KINDS[kind]}: ${d.trip || "New enquiry"} (${d.name})`,
-      text, html,
-    });
-    return json({ ok: true });
-  } catch (e) {
-    console.error("[enquiry] send failed:", e && e.code, e && e.message);
-    return json({ ok: false, error: "We could not send your message by email just now. Please use WhatsApp or try again." }, 502);
+  if (saved && db) {
+    await db.from("enquiries").update({
+      email_status: mailed.ok ? "sent" : "failed", email_error: mailed.ok ? null : String(mailed.error || "").slice(0, 500), email_attempts: 1,
+    }).eq("id", saved.id);
   }
+  if (!saved && !mailed.ok) return json({ ok: false, error: "We could not send your message just now. Please use WhatsApp or try again." }, 502);
+  return json({ ok: true, reference: saved?.reference || null });
 }

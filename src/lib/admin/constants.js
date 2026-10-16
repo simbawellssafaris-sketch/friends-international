@@ -1,0 +1,11 @@
+export const ENQUIRY_STATUSES = ["new", "contacted", "qualified", "quoted", "converted", "lost"];
+export const ACTIVITY_KINDS = ["note", "call", "email", "whatsapp", "meeting"];
+export const ACTIVITY_LABEL = { note: "Note", call: "Phone call", email: "Email", whatsapp: "WhatsApp", meeting: "Meeting", status_change: "Status change", system: "System" };
+export const PAYMENT_METHODS = [["bank_transfer", "Bank transfer"], ["mobile_money", "Mobile money (M-Pesa etc.)"], ["card", "Card (via provider)"], ["cash", "Cash"], ["cheque", "Cheque"], ["other", "Other"]];
+export const PAYMENT_STATUSES = ["pending", "confirmed", "failed", "refunded"];
+export const QUOTE_STATUSES = ["draft", "sent", "accepted", "declined", "expired", "superseded"];
+export const ITEM_CATEGORIES = [["accommodation", "Accommodation"], ["transport", "Transport"], ["activity", "Activities"], ["park_fee", "Park fees"], ["flight", "Flights"], ["transfer", "Transfers"], ["other", "Other"]];
+export const INVOICE_STATUSES = ["draft", "issued", "part_paid", "paid", "void"];
+export const DOC_KINDS = [["passport", "Passport"], ["visa", "Visa"], ["ticket", "Ticket"], ["voucher", "Voucher"], ["receipt", "Receipt"], ["quotation", "Quotation"], ["other", "Other"]];
+export const CURRENCIES = ["USD", "EUR", "GBP", "KES"];
+export const DEFAULT_CURRENCY = "USD";
