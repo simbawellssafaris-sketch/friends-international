@@ -229,3 +229,23 @@
   .adm-main{padding:0}
   .doc{border:0;padding:0;max-width:none}
 }
+
+/* website content + reports */
+.mline{display:block}
+.adm-h2{font-size:1.2rem;margin:22px 0 10px}
+.content-card{display:block;text-decoration:none;transition:.15s}
+.content-card:hover{border-color:var(--gold);box-shadow:0 6px 22px #0001}
+.adm-hint{display:block;color:var(--mut);font-size:.78rem;margin-top:4px;font-weight:400}
+.adm-ref{background:#fbf8ef;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:.88rem}
+.adm-ref summary{cursor:pointer;font-weight:600;color:var(--green)}
+.adm-ref ul{margin:8px 0 0 18px}
+.adm-day{display:grid;gap:6px;margin:12px 0;padding-top:10px;border-top:1px solid var(--line)}
+.adm-day input,.adm-day textarea{padding:8px 10px;border:1.5px solid var(--sand);border-radius:10px;font:inherit;font-size:.9rem;background:#fff;width:100%}
+.adm-pic{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.adm-pic img{border-radius:12px;object-fit:cover;border:1px solid var(--line);width:180px;height:110px}
+.adm-check{display:flex;gap:8px;align-items:center;font-size:.85rem;margin-top:6px}
+.adm-acc summary{cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center;list-style:none}
+.adm-acc summary::-webkit-details-marker{display:none}
+.adm-acc[open] summary{margin-bottom:12px}
+.adm-acc form{margin-bottom:10px}
+::placeholder{color:#9a9a8f}

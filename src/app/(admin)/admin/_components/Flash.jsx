@@ -1,7 +1,7 @@
 // Fixed set of messages, chosen by a short code in the address (?ok=saved). Nothing from the URL is shown as-is.
 const OK = {
   saved: "Saved.", noted: "Note added.", archived: "Archived.", restored: "Restored.", converted: "Converted to a booking.",
-  created: "Created.", sent: "Sent.", paid: "Payment recorded.", deleted: "Removed.", retried: "Email sent.", uploaded: "File uploaded.",
+  created: "Created.", published: "Published. Visitors can see it now.", sent: "Sent.", paid: "Payment recorded.", deleted: "Removed.", retried: "Email sent.", uploaded: "File uploaded.",
 };
 const ERR = {
   invalid: "Please check the highlighted details and try again.",

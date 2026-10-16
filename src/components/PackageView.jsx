@@ -23,7 +23,7 @@ function Cell({ c }) {
   return c;
 }
 
-export default function PackageView({ p, view }) {
+export default function PackageView({ p, view, content = {} }) {
   const [pax, setPax] = useState(0);
   useEffect(() => { setPax(Math.max(1, parseInt(new URLSearchParams(window.location.search).get("pax"), 10) || 0)); }, []);
   const { open } = useBooking();
@@ -69,7 +69,7 @@ export default function PackageView({ p, view }) {
               <div><small>Style</small><b>{v.tierLabel}</b></div>
               <div><small>Best for</small><b>{v.styleLabel}</b></div>
               <div><small>Route</small><b>{v.routeText}</b></div>
-              <div><small>Price</small><b>On request</b></div>
+              <div><small>Price</small><b>{content.priceLabel || "On request"}</b></div>
             </div>
             <div className="two sumbox">
               <div className="box good"><h4>Included</h4><ul>{v.summary.inc.map((x) => <li key={x}>{x}</li>)}</ul></div>
@@ -104,6 +104,7 @@ export default function PackageView({ p, view }) {
 
           <section id="itinerary" className="ps">
             <h2>Day-by-day itinerary</h2>
+            {content.itineraryNotes ? <p className="lead2 itin-note">{content.itineraryNotes}</p> : null}
             {v.itinerary.map((d) => (
               <div className="day" key={d.n}>
                 <div className="dn"><span>Day</span><b>{d.n}</b></div>
@@ -193,7 +194,7 @@ export default function PackageView({ p, view }) {
 
         <aside>
           <div className="bookcard">
-            <small>Price</small><div className="bprice">On request</div>
+            <small>Price</small><div className="bprice">{content.priceLabel || "On request"}</div>
             <p className="muted">{p.days} days · {v.tierLabel}{v.luxFlights ? " · internal flights included" : ""}</p>
             <button className="btn full" type="button" onClick={() => book("book")}>Book this trip</button>
             <button className="btn ghost dark full" type="button" onClick={() => book("customize")}>Customise this trip</button>

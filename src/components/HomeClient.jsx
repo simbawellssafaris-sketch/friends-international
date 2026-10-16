@@ -41,7 +41,7 @@ function PortalItem({ href, label, sub }) {
   );
 }
 
-export default function HomeClient({ initial = {} }) {
+export default function HomeClient({ initial = {}, extra = null }) {
   const { type: iType = "", sty: iSty = "", aud: iAud = "" } = initial;
   const [f, setF] = useState({ tier: "", type: iType, aud: iAud, sty: iSty, q: "", pax: 2 });
   const [expanded, setExpanded] = useState(!!(iType || iSty || iAud));
@@ -375,6 +375,8 @@ export default function HomeClient({ initial = {} }) {
           </div>
         </div>
       </section>
+
+      {extra}
 
       <section className="sec" id="contact">
         <div className="wrap split">

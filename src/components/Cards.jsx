@@ -2,6 +2,7 @@ import Link from "next/link";
 import Icon from "./Icon";
 import SafeImg from "./SafeImg";
 import { STYLE_INFO, pkgIncSummary } from "@/data/site";
+import { usePackageContent } from "./ContentProvider";
 
 export const tierName = { budget: "Budget", mid: "Mid-range", luxury: "Luxury" };
 
@@ -33,11 +34,14 @@ export function IncBlock({ p }) {
 // One package card. Used on the home page, country pages and the residents page.
 // resLabel: text of the resident badge ("Residents · pick-up from home" or "Pick-up from home").
 export function PackageCard({ p, pax = 0, resLabel = "Residents · pick-up from home", alwaysRes = false }) {
+  const c = usePackageContent(p.id);
+  if (c.listed === false) return null; // unpublished from the admin area
+  const title = c.title || p.title;
   const url = `/packages/${p.id}${pax > 1 ? `?pax=${pax}` : ""}`;
   return (
     <article className="card">
       <Link className="ph" href={url}>
-        <SafeImg src={p.img} alt={p.title} />
+        <SafeImg src={c.image_url || p.img} alt={title} />
         <StyleBadge p={p} />
         <span className={`tag ${p.tier}`}>{tierName[p.tier]}</span>
         <span className="days">{p.days} days</span>
@@ -50,11 +54,11 @@ export function PackageCard({ p, pax = 0, resLabel = "Residents · pick-up from 
           {p.multi && <span>Multi-destination</span>}
           {p.flights && <span className="fl"><Icon name="plane" size={13} /> Internal flights included</span>}
         </div>
-        <h3><Link href={url}>{p.title}</Link></h3>
+        <h3><Link href={url}>{title}</Link></h3>
         <p className="route">{p.route.map((r) => r.d).join(" · ")}</p>
         <IncBlock p={p} />
         <div className="cf">
-          <div><span className="p">Price</span><strong className="onreq">On request</strong></div>
+          <div><span className="p">Price</span><strong className="onreq">{c.price_label || "On request"}</strong></div>
           <Link className="btn sm" href={url}>View trip</Link>
         </div>
       </div>

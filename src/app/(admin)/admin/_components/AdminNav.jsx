@@ -11,6 +11,8 @@ const ITEMS = [
   { href: "/admin/quotations", label: "Quotations" },
   { href: "/admin/invoices", label: "Invoices" },
   { href: "/admin/payments", label: "Payments" },
+  { href: "/admin/reports", label: "Reports" },
+  { href: "/admin/content", label: "Website content" },
 ];
 
 export default function AdminNav() {
