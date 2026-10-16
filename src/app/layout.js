@@ -1,7 +1,4 @@
 import "./globals.css";
-import Nav from "@/components/Nav";
-import TopBar from "@/components/TopBar";
-import BookingProvider from "@/components/BookingProvider";
 
 export const metadata = {
   title: "Friends International Limited | Safaris, Beaches, Dubai & Europe",
@@ -11,6 +8,8 @@ export const metadata = {
 
 export const viewport = { width: "device-width", initialScale: 1 };
 
+// Shared shell for the whole app. The public site's menu and booking pop-up live in (site)/layout.js,
+// and the private admin area has its own layout under (admin)/admin.
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
@@ -21,13 +20,7 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body>
-        <BookingProvider>
-          <TopBar />
-          <Nav />
-          {children}
-        </BookingProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
