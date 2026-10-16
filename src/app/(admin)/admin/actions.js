@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSession } from "@/lib/admin/session";
@@ -33,6 +33,9 @@ export async function signIn(_prev, formData) {
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error && (error.name === "AuthRetryableFetchError" || !error.status || error.status >= 500)) {
+    return { error: "Sign-in is temporarily unavailable. Please wait a moment and try again." };
+  }
   if (error || !data?.user) return { error: BAD_LOGIN };
 
   const { data: profile } = await supabase.from("admin_profiles").select("active").eq("user_id", data.user.id).maybeSingle();
@@ -40,10 +43,13 @@ export async function signIn(_prev, formData) {
     await supabase.auth.signOut();
     return { error: BAD_LOGIN }; // same message: do not reveal which accounts exist
   }
+  // restart the inactivity timer so an old visit's timestamp cannot sign this new session straight out again
+  (await cookies()).set("fi_admin_seen", String(Date.now()), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/admin", maxAge: 60 * 60 * 12 });
   redirect("/admin/mfa");
 }
 
 export async function signOutAction() {
+  (await cookies()).delete({ name: "fi_admin_seen", path: "/admin" });
   const s = await getSession();
   if (s) {
     if (s.aal === "aal2" && s.profile) {
