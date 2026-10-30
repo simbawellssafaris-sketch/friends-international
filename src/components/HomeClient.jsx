@@ -385,7 +385,7 @@ export default function HomeClient({ initial = {}, extra = null }) {
             <h2>Plan your trip</h2>
             <p>Tell us where you want to go and we will send a personalised quote.</p>
             <ul className="ticks">
-              <li><Icon name="phone" size={16} /> <span className="c-phone">{CONFIG.phoneDisplay}</span></li>
+              <li><Icon name="phone" size={16} /> <a className="c-phone" href={`tel:${CONFIG.phoneTel}`}>{CONFIG.phoneDisplay}</a></li>
               <li><Icon name="mail" size={16} /> <span className="c-email">{CONFIG.email}</span></li>
               <li><Icon name="map-pin" size={16} /> Nairobi, Kenya</li>
             </ul>

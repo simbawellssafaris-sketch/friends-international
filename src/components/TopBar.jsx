@@ -10,7 +10,7 @@ export default function TopBar() {
     <div className="topbar">
       <div className="wrap">
         <span>
-          <Icon name="phone" size={14} /> <span className="c-phone">{CONFIG.phoneDisplay}</span> &nbsp;·&nbsp;{" "}
+          <Icon name="phone" size={14} /> <a className="c-phone" href={`tel:${CONFIG.phoneTel}`}>{CONFIG.phoneDisplay}</a> &nbsp;·&nbsp;{" "}
           <Icon name="mail" size={14} /> <span className="c-email">{CONFIG.email}</span>
         </span>
         <span className="hide-sm">Safaris · Beaches · Dubai · Europe · Asia</span>
